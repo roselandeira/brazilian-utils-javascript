@@ -1,17 +1,26 @@
-import { sanitizeToDigits } from "../_internals/sanitize-to-digits/sanitize-to-digits";
 import { LENGTH, RESERVED_NUMBERS } from "./constants";
 
 const RESERVED_SET = new Set(RESERVED_NUMBERS);
+
+const BASE_LENGTH = 12;
 
 const WEIGHTS_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
 const WEIGHTS_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
+/**
+ * Matches a CNPJ with or without the `AA.AAA.AAA/AAAA-DV` mask.
+ *
+ * The first 12 positions accept letters (case-insensitive) and digits, while
+ * the 2 check digits (DV) remain strictly numeric.
+ */
 const FORMAT_REGEX =
-	/^[0-9A-Z]{2}\.?[0-9A-Z]{3}\.?[0-9A-Z]{3}\/?[0-9A-Z]{4}-?[0-9]{2}$/;
+	/^[0-9A-Za-z]{2}\.?[0-9A-Za-z]{3}\.?[0-9A-Za-z]{3}\/?[0-9A-Za-z]{4}-?[0-9]{2}$/;
 
-const NUMERIC_FORMAT_REGEX = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
-
+/**
+ * Removes the mask characters and normalizes letters to uppercase, keeping only
+ * the alphanumeric positions of a CNPJ.
+ */
 const cleanCnpj = (cnpj: string): string => {
 	let result = "";
 	for (let i = 0; i < cnpj.length; i++) {
@@ -30,47 +39,60 @@ const cleanCnpj = (cnpj: string): string => {
 	return result;
 };
 
-const isValidChecksum = (cnpj: string): boolean => {
-	// First digit (index 12)
+/**
+ * Computes the expected DV character for a given partial CNPJ using the
+ * modulo 11 algorithm. Each position is converted to a number with
+ * `charCodeAt - 48`, so `'0'..'9'` map to `0..9` and `'A'..'Z'` map to `17..42`.
+ */
+const expectedCheckDigit = (cnpj: string, weights: number[]): number => {
 	let sum = 0;
-	for (let i = 0; i < 12; i++) {
-		sum += (cnpj.charCodeAt(i) - 48) * WEIGHTS_1[i];
+	for (let i = 0; i < weights.length; i++) {
+		sum += (cnpj.charCodeAt(i) - 48) * weights[i];
 	}
-	let mod = sum % 11;
-	const expected1 = mod < 2 ? 48 : 48 + 11 - mod;
-	if (cnpj.charCodeAt(12) !== expected1) return false;
-
-	// Second digit (index 13)
-	sum = 0;
-	for (let i = 0; i < 13; i++) {
-		sum += (cnpj.charCodeAt(i) - 48) * WEIGHTS_2[i];
-	}
-	mod = sum % 11;
-	const expected2 = mod < 2 ? 48 : 48 + 11 - mod;
-	return cnpj.charCodeAt(13) === expected2;
+	const mod = sum % 11;
+	// The DV is always numeric; 48 is the char code of '0'.
+	return mod < 2 ? 48 : 48 + 11 - mod;
 };
+
+const isValidChecksum = (cnpj: string): boolean =>
+	cnpj.charCodeAt(12) === expectedCheckDigit(cnpj, WEIGHTS_1) &&
+	cnpj.charCodeAt(13) === expectedCheckDigit(cnpj, WEIGHTS_2);
 
 /**
  * Validates if a CNPJ (Cadastro Nacional da Pessoa Jurídica) is valid.
- * Supports both numeric (version 1) and alphanumeric (version 2) CNPJ formats.
+ *
+ * By default both the legacy numeric format and the new alphanumeric format
+ * (Receita Federal IN RFB 2.229/2024 / NT 2025.001, effective July 2026) are
+ * accepted. The input may be masked (`AA.AAA.AAA/AAAA-DV`) or unmasked, and
+ * letters are treated case-insensitively (normalized to uppercase).
+ *
+ * The check digits (DV) are computed with the modulo 11 algorithm where each of
+ * the first 12 characters is converted to a number using `charCodeAt - 48`
+ * (`'0'..'9'` -> `0..9`, `'A'` -> `17`, `'B'` -> `18`, ...). The 2 DV positions
+ * are always numeric.
  *
  * @param {string} cnpj - The CNPJ value to be validated.
  * @param {{version?: 1|2}} [options] - Optional options:
- *    version = 1 -> validate numeric-only format (default)
+ *    version = 1 -> validate numeric-only format (legacy strict mode)
  *    version = 2 -> validate both numeric and alphanumeric formats
+ *    (omitted)   -> validate both numeric and alphanumeric formats
  * @returns {boolean} True if the CNPJ is valid, false otherwise.
  *
  * @example
  * ```typescript
- * // Version 1 (numeric - default)
+ * // Numeric (backward compatible)
  * isValidCnpj("12.345.678/0001-95"); // true
  * isValidCnpj("12345678000195"); // true
  * isValidCnpj("00000000000000"); // false (reserved number)
  * isValidCnpj("12345678000190"); // false (invalid checksum)
  *
- * // Version 2 (alphanumeric)
- * isValidCnpj("Q0.SLF.MBD/7VX4-39", { version: 2 }); // true (alphanumeric)
- * isValidCnpj("Q0SLFMBD7VX439", { version: 2 }); // true (alphanumeric)
+ * // Alphanumeric
+ * isValidCnpj("12.ABC.345/01DE-35"); // true
+ * isValidCnpj("12ABC34501DE35"); // true (unmasked)
+ * isValidCnpj("12.abc.345/01de-35"); // true (lowercase)
+ *
+ * // Restrict to numeric-only
+ * isValidCnpj("12.ABC.345/01DE-35", { version: 1 }); // false
  * ```
  */
 export const isValidCnpj = (
@@ -79,34 +101,26 @@ export const isValidCnpj = (
 ): boolean => {
 	if (!cnpj || typeof cnpj !== "string") return false;
 
+	if (!FORMAT_REGEX.test(cnpj)) return false;
+
 	const cleaned = cleanCnpj(cnpj);
 
 	if (cleaned.length !== LENGTH) return false;
 
-	const version = options?.version ?? 1;
-
 	let isNumeric = true;
-	let hasLetter = false;
-
-	if (version !== 1) {
-		for (let i = 0; i < LENGTH; i++) {
-			const code = cleaned.charCodeAt(i);
-			if (code < 48 || code > 57) {
-				isNumeric = false;
-				if (code >= 65 && code <= 90) hasLetter = true;
-			}
+	for (let i = 0; i < BASE_LENGTH; i++) {
+		const code = cleaned.charCodeAt(i);
+		if (code < 48 || code > 57) {
+			isNumeric = false;
+			break;
 		}
 	}
 
-	if (isNumeric) {
-		const numeric = sanitizeToDigits(cnpj);
+	// Legacy strict mode: reject anything that is not purely numeric.
+	if (options?.version === 1 && !isNumeric) return false;
 
-		return (
-			NUMERIC_FORMAT_REGEX.test(cnpj) &&
-			!RESERVED_SET.has(numeric) &&
-			isValidChecksum(numeric)
-		);
-	}
+	// Reserved repeated-digit numbers are only invalid for numeric CNPJs.
+	if (isNumeric && RESERVED_SET.has(cleaned)) return false;
 
-	return hasLetter && FORMAT_REGEX.test(cnpj) && isValidChecksum(cleaned);
+	return isValidChecksum(cleaned);
 };

@@ -63,6 +63,28 @@ describe("isValidCnpj", () => {
 			expect(isValidCnpj("AB.1C2.D3E/4F5G-3")).toBe(false); // Too short
 			expect(isValidCnpj("AB.1C2.D3E/4F5G-356")).toBe(false); // Too long
 		});
+
+		test("when an alphanumeric CNPJ has wrong check digits", () => {
+			expect(isValidCnpj("12ABC34501DE34")).toBe(false);
+			expect(isValidCnpj("12.ABC.345/01DE-36")).toBe(false);
+			expect(isValidCnpj("12.abc.345/01de-34")).toBe(false); // lowercase, wrong DV
+		});
+
+		test("when the check digits (DV) are not numeric", () => {
+			expect(isValidCnpj("12.ABC.345/01DE-3A")).toBe(false);
+			expect(isValidCnpj("12ABC34501DEAB")).toBe(false);
+		});
+
+		test("when it contains non-allowed characters", () => {
+			expect(isValidCnpj("12.AB#.345/01DE-35")).toBe(false);
+			expect(isValidCnpj("12-ABC-345-01DE-35")).toBe(false);
+			expect(isValidCnpj("12 ABC 345 01DE 35")).toBe(false);
+		});
+
+		test("when version 1 (numeric-only) receives an alphanumeric CNPJ", () => {
+			expect(isValidCnpj("12.ABC.345/01DE-35", { version: 1 })).toBe(false);
+			expect(isValidCnpj("12ABC34501DE35", { version: 1 })).toBe(false);
+		});
 	});
 
 	describe("should return true", () => {
@@ -72,6 +94,34 @@ describe("isValidCnpj", () => {
 
 		test("when is a CNPJ valid with mask", () => {
 			expect(isValidCnpj("60.391.947/0001-00")).toBe(true);
+		});
+
+		test("when a numeric CNPJ is still valid under version 1", () => {
+			expect(isValidCnpj("13723705000189", { version: 1 })).toBe(true);
+			expect(isValidCnpj("60.391.947/0001-00", { version: 1 })).toBe(true);
+		});
+
+		test("when is a valid alphanumeric CNPJ (canonical example)", () => {
+			expect(isValidCnpj("12.ABC.345/01DE-35")).toBe(true); // masked
+			expect(isValidCnpj("12ABC34501DE35")).toBe(true); // unmasked
+		});
+
+		test("when an alphanumeric CNPJ is given in lowercase", () => {
+			expect(isValidCnpj("12.abc.345/01de-35")).toBe(true);
+			expect(isValidCnpj("12abc34501de35")).toBe(true);
+		});
+
+		test("when is another valid alphanumeric CNPJ", () => {
+			expect(isValidCnpj("Q0.SLF.MBD/7VX4-39")).toBe(true); // masked
+			expect(isValidCnpj("Q0SLFMBD7VX439")).toBe(true); // unmasked
+			expect(isValidCnpj("q0slfmbd7vx439")).toBe(true); // lowercase
+		});
+
+		test("when generated CNPJs validate without passing options", () => {
+			for (let i = 0; i < 100; i++) {
+				expect(isValidCnpj(generateCnpj(1))).toBe(true); // numeric
+				expect(isValidCnpj(generateCnpj(2))).toBe(true); // alphanumeric
+			}
 		});
 
 		for (let i = 0; i < 100; i++) {
