@@ -8,7 +8,7 @@ const WEIGHTS_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 const WEIGHTS_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
 const FORMAT_REGEX =
-	/^[0-9A-Z]{2}\.?[0-9A-Z]{3}\.?[0-9A-Z]{3}\/?[0-9A-Z]{4}-?[0-9]{2}$/;
+	/^[0-9A-Z]{2}\.?[0-9A-Z]{3}\.?[0-9A-Z]{3}\/?[0-9A-Z]{4}-?[0-9]{2}$/i;
 
 const NUMERIC_FORMAT_REGEX = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
 
@@ -52,49 +52,39 @@ const isValidChecksum = (cnpj: string): boolean => {
 
 /**
  * Validates if a CNPJ (Cadastro Nacional da Pessoa Jurídica) is valid.
- * Supports both numeric (version 1) and alphanumeric (version 2) CNPJ formats.
+ * Supports both numeric and alphanumeric CNPJ formats (IN RFB 2.229/2024).
  *
  * @param {string} cnpj - The CNPJ value to be validated.
- * @param {{version?: 1|2}} [options] - Optional options:
- *    version = 1 -> validate numeric-only format (default)
- *    version = 2 -> validate both numeric and alphanumeric formats
  * @returns {boolean} True if the CNPJ is valid, false otherwise.
  *
  * @example
  * ```typescript
- * // Version 1 (numeric - default)
+ * // Numeric
  * isValidCnpj("12.345.678/0001-95"); // true
  * isValidCnpj("12345678000195"); // true
  * isValidCnpj("00000000000000"); // false (reserved number)
- * isValidCnpj("12345678000190"); // false (invalid checksum)
  *
- * // Version 2 (alphanumeric)
- * isValidCnpj("Q0.SLF.MBD/7VX4-39", { version: 2 }); // true (alphanumeric)
- * isValidCnpj("Q0SLFMBD7VX439", { version: 2 }); // true (alphanumeric)
+ * // Alphanumeric (IN RFB 2.229/2024)
+ * isValidCnpj("12.ABC.345/01DE-35"); // true
+ * isValidCnpj("12ABC34501DE35"); // true
+ * isValidCnpj("12.abc.345/01de-35"); // true (lowercase accepted)
  * ```
  */
-export const isValidCnpj = (
-	cnpj: string,
-	options?: { version?: 1 | 2 },
-): boolean => {
+export const isValidCnpj = (cnpj: string): boolean => {
 	if (!cnpj || typeof cnpj !== "string") return false;
 
 	const cleaned = cleanCnpj(cnpj);
 
 	if (cleaned.length !== LENGTH) return false;
 
-	const version = options?.version ?? 1;
-
 	let isNumeric = true;
 	let hasLetter = false;
 
-	if (version !== 1) {
-		for (let i = 0; i < LENGTH; i++) {
-			const code = cleaned.charCodeAt(i);
-			if (code < 48 || code > 57) {
-				isNumeric = false;
-				if (code >= 65 && code <= 90) hasLetter = true;
-			}
+	for (let i = 0; i < LENGTH; i++) {
+		const code = cleaned.charCodeAt(i);
+		if (code < 48 || code > 57) {
+			isNumeric = false;
+			if (code >= 65 && code <= 90) hasLetter = true;
 		}
 	}
 
