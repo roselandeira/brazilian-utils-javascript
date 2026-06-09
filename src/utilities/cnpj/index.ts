@@ -1,11 +1,15 @@
 import { isLastChar, onlyNumbers, generateChecksum, generateRandomNumber } from '../../helpers';
 
 function stripCnpjMask(input: string): string {
-  return input.replace(/[.\/-]/g, '').toUpperCase();
+  return input.replace(/[.\-/]/g, '').toUpperCase();
 }
 
 function cnpjCharValue(ch: string): number {
   return ch.charCodeAt(0) - 48;
+}
+
+function alphanumericChecksum(chars: string, weights: number[]): number {
+  return chars.split('').reduce((acc, ch, i) => acc + cnpjCharValue(ch) * weights[i], 0);
 }
 
 export const LENGTH = 14;
@@ -84,6 +88,29 @@ export function isReservedNumber(cpf: string): boolean {
 
 // TODO: move to checksum helper
 export function isValidChecksum(cnpj: string): boolean {
+  const isAlpha = /[A-Z]/.test(cnpj);
+
+  if (!isAlpha) {
+    const weights = [...FIRST_CHECK_DIGIT_WEIGHTS];
+
+    return CHECK_DIGITS_INDEXES.every((i) => {
+      if (i === CHECK_DIGITS_INDEXES[CHECK_DIGITS_INDEXES.length - 1]) {
+        weights.unshift(6);
+      }
+
+      const mod =
+        generateChecksum(
+          cnpj
+            .slice(0, i)
+            .split('')
+            .reduce((acc, digit) => acc + digit, ''),
+          weights
+        ) % 11;
+
+      return cnpj[i] === String(mod < 2 ? 0 : 11 - mod);
+    });
+  }
+
   const weights = [...FIRST_CHECK_DIGIT_WEIGHTS];
 
   return CHECK_DIGITS_INDEXES.every((i) => {
@@ -91,34 +118,9 @@ export function isValidChecksum(cnpj: string): boolean {
       weights.unshift(6);
     }
 
-    const mod =
-      generateChecksum(
-        cnpj
-          .slice(0, i)
-          .split('')
-          .reduce((acc, digit) => acc + digit, ''),
-        weights
-      ) % 11;
+    const mod = alphanumericChecksum(cnpj.slice(0, i), weights) % 11;
 
     return cnpj[i] === String(mod < 2 ? 0 : 11 - mod);
-  });
-}
-
-function isValidAlphanumericChecksum(stripped: string): boolean {
-  const weights = [...FIRST_CHECK_DIGIT_WEIGHTS];
-
-  return CHECK_DIGITS_INDEXES.every((i) => {
-    if (i === CHECK_DIGITS_INDEXES[CHECK_DIGITS_INDEXES.length - 1]) {
-      weights.unshift(6);
-    }
-
-    const mod =
-      stripped
-        .slice(0, i)
-        .split('')
-        .reduce((acc, ch, idx) => acc + cnpjCharValue(ch) * weights[idx], 0) % 11;
-
-    return stripped[i] === String(mod < 2 ? 0 : 11 - mod);
   });
 }
 
@@ -131,5 +133,5 @@ export function isValid(cnpj: string): boolean {
   if (!isValidFormat(cnpj)) return false;
   if (/^\d+$/.test(stripped) && isReservedNumber(stripped)) return false;
 
-  return isValidAlphanumericChecksum(stripped);
+  return isValidChecksum(stripped);
 }
