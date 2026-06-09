@@ -1,6 +1,16 @@
 import { isLastChar, onlyNumbers, generateChecksum, generateRandomNumber } from '../../helpers';
 
-const MASK_RE = /[.\-/]/g;
+function stripCnpjMask(input: string): string {
+  return input.replace(/[.\-/]/g, '').toUpperCase();
+}
+
+function cnpjCharValue(ch: string): number {
+  return ch.charCodeAt(0) - 48;
+}
+
+function alphanumericChecksum(chars: string, weights: number[]): number {
+  return chars.split('').reduce((acc, ch, i) => acc + cnpjCharValue(ch) * weights[i], 0);
+}
 
 export const LENGTH = 14;
 
@@ -69,26 +79,18 @@ export function generate(): string {
 }
 
 export function isValidFormat(cnpj: string): boolean {
-  return /^[0-9A-Z]{2}\.?[0-9A-Z]{3}\.?[0-9A-Z]{3}\/?[0-9A-Z]{4}-?\d{2}$/.test(cnpj);
+  return /^[0-9A-Za-z]{2}\.?[0-9A-Za-z]{3}\.?[0-9A-Za-z]{3}\/?[0-9A-Za-z]{4}-?\d{2}$/.test(cnpj);
 }
 
 export function isReservedNumber(cpf: string): boolean {
   return RESERVED_NUMBERS.indexOf(cpf) >= 0;
 }
 
-function cnpjCharValue(ch: string): number {
-  return ch.charCodeAt(0) - 48;
-}
-
-function alphanumericChecksum(chars: string, weights: number[]): number {
-  return chars.split('').reduce((acc, ch, i) => acc + cnpjCharValue(ch) * weights[i], 0);
-}
-
 // TODO: move to checksum helper
 export function isValidChecksum(cnpj: string): boolean {
-  const isAlphanumeric = /[A-Z]/.test(cnpj);
+  const isAlpha = /[A-Z]/.test(cnpj);
 
-  if (!isAlphanumeric) {
+  if (!isAlpha) {
     const weights = [...FIRST_CHECK_DIGIT_WEIGHTS];
 
     return CHECK_DIGITS_INDEXES.every((i) => {
@@ -125,17 +127,11 @@ export function isValidChecksum(cnpj: string): boolean {
 export function isValid(cnpj: string): boolean {
   if (!cnpj || typeof cnpj !== 'string') return false;
 
-  const normalized = cnpj.toUpperCase();
-  const unmasked = normalized.replace(MASK_RE, '');
+  const stripped = stripCnpjMask(cnpj);
 
-  if (unmasked.length !== LENGTH) return false;
+  if (stripped.length !== LENGTH) return false;
+  if (!isValidFormat(cnpj)) return false;
+  if (/^\d+$/.test(stripped) && isReservedNumber(stripped)) return false;
 
-  const isAlphanumeric = /[A-Z]/.test(unmasked);
-
-  if (!isAlphanumeric) {
-    const numbers = onlyNumbers(cnpj);
-    return isValidFormat(normalized) && !isReservedNumber(numbers) && isValidChecksum(numbers);
-  }
-
-  return isValidFormat(normalized) && isValidChecksum(unmasked);
+  return isValidChecksum(stripped);
 }
