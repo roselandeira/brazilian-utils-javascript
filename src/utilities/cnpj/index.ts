@@ -1,5 +1,13 @@
 import { isLastChar, onlyNumbers, generateChecksum, generateRandomNumber } from '../../helpers';
 
+function stripCnpjMask(input: string): string {
+  return input.replace(/[.\/-]/g, '').toUpperCase();
+}
+
+function cnpjCharValue(ch: string): number {
+  return ch.charCodeAt(0) - 48;
+}
+
 export const LENGTH = 14;
 
 export const DOT_INDEXES = [1, 4];
@@ -67,7 +75,7 @@ export function generate(): string {
 }
 
 export function isValidFormat(cnpj: string): boolean {
-  return /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(cnpj);
+  return /^[0-9A-Za-z]{2}\.?[0-9A-Za-z]{3}\.?[0-9A-Za-z]{3}\/?[0-9A-Za-z]{4}-?\d{2}$/.test(cnpj);
 }
 
 export function isReservedNumber(cpf: string): boolean {
@@ -96,10 +104,32 @@ export function isValidChecksum(cnpj: string): boolean {
   });
 }
 
+function isValidAlphanumericChecksum(stripped: string): boolean {
+  const weights = [...FIRST_CHECK_DIGIT_WEIGHTS];
+
+  return CHECK_DIGITS_INDEXES.every((i) => {
+    if (i === CHECK_DIGITS_INDEXES[CHECK_DIGITS_INDEXES.length - 1]) {
+      weights.unshift(6);
+    }
+
+    const mod =
+      stripped
+        .slice(0, i)
+        .split('')
+        .reduce((acc, ch, idx) => acc + cnpjCharValue(ch) * weights[idx], 0) % 11;
+
+    return stripped[i] === String(mod < 2 ? 0 : 11 - mod);
+  });
+}
+
 export function isValid(cnpj: string): boolean {
   if (!cnpj || typeof cnpj !== 'string') return false;
 
-  const numbers = onlyNumbers(cnpj);
+  const stripped = stripCnpjMask(cnpj);
 
-  return isValidFormat(cnpj) && !isReservedNumber(numbers) && isValidChecksum(numbers);
+  if (stripped.length !== LENGTH) return false;
+  if (!isValidFormat(cnpj)) return false;
+  if (/^\d+$/.test(stripped) && isReservedNumber(stripped)) return false;
+
+  return isValidAlphanumericChecksum(stripped);
 }

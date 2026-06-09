@@ -150,4 +150,42 @@ describe('isValid', () => {
       expect(isValid('60.391.947/0001-00')).toBe(true);
     });
   });
+
+  describe('alphanumeric CNPJ', () => {
+    describe('should return true', () => {
+      test('when is a valid alphanumeric CNPJ with mask', () => {
+        expect(isValid('12.ABC.345/01DE-35')).toBe(true);
+      });
+
+      test('when is a valid alphanumeric CNPJ without mask', () => {
+        expect(isValid('12ABC34501DE35')).toBe(true);
+      });
+
+      test('when is a valid alphanumeric CNPJ in lowercase', () => {
+        expect(isValid('12.abc.345/01de-35')).toBe(true);
+      });
+
+      test('when is a valid alphanumeric CNPJ lowercase without mask', () => {
+        expect(isValid('12abc34501de35')).toBe(true);
+      });
+    });
+
+    describe('should return false', () => {
+      test('when alphanumeric CNPJ has wrong check digits', () => {
+        expect(isValid('12ABC34501DE99')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ has letters in check digit positions', () => {
+        expect(isValid('12ABC34501DEAB')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ is too short', () => {
+        expect(isValid('12ABC3450135')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ is too long', () => {
+        expect(isValid('12ABC34501DE350')).toBe(false);
+      });
+    });
+  });
 });
