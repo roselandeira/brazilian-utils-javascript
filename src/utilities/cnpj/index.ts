@@ -1,5 +1,13 @@
 import { isLastChar, onlyNumbers, generateChecksum, generateRandomNumber } from '../../helpers';
 
+function sanitizeCnpj(input: string): string {
+  return input.replace(/[.\-/]/g, '').toUpperCase();
+}
+
+function charValue(ch: string): number {
+  return ch.charCodeAt(0) - 48;
+}
+
 export const LENGTH = 14;
 
 export const DOT_INDEXES = [1, 4];
@@ -67,7 +75,7 @@ export function generate(): string {
 }
 
 export function isValidFormat(cnpj: string): boolean {
-  return /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(cnpj);
+  return /^[A-Z0-9]{2}\.?[A-Z0-9]{3}\.?[A-Z0-9]{3}\/?[A-Z0-9]{4}-?\d{2}$/i.test(cnpj);
 }
 
 export function isReservedNumber(cpf: string): boolean {
@@ -83,14 +91,9 @@ export function isValidChecksum(cnpj: string): boolean {
       weights.unshift(6);
     }
 
-    const mod =
-      generateChecksum(
-        cnpj
-          .slice(0, i)
-          .split('')
-          .reduce((acc, digit) => acc + digit, ''),
-        weights
-      ) % 11;
+    const slice = cnpj.slice(0, i);
+    const sum = slice.split('').reduce((acc, ch, idx) => acc + charValue(ch) * weights[idx], 0);
+    const mod = sum % 11;
 
     return cnpj[i] === String(mod < 2 ? 0 : 11 - mod);
   });
@@ -99,7 +102,7 @@ export function isValidChecksum(cnpj: string): boolean {
 export function isValid(cnpj: string): boolean {
   if (!cnpj || typeof cnpj !== 'string') return false;
 
-  const numbers = onlyNumbers(cnpj);
+  const sanitized = sanitizeCnpj(cnpj);
 
-  return isValidFormat(cnpj) && !isReservedNumber(numbers) && isValidChecksum(numbers);
+  return isValidFormat(cnpj) && !isReservedNumber(sanitized) && isValidChecksum(sanitized);
 }
