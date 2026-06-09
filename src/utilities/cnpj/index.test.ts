@@ -150,4 +150,26 @@ describe('isValid', () => {
       expect(isValid('60.391.947/0001-00')).toBe(true);
     });
   });
+
+  describe('alphanumeric CNPJ', () => {
+    test('should validate official example unmasked', () => {
+      expect(isValid('12ABC34501DE35')).toBe(true);
+    });
+
+    test('should validate official example masked', () => {
+      expect(isValid('12.ABC.345/01DE-35')).toBe(true);
+    });
+
+    test('should validate lowercase input', () => {
+      expect(isValid('12.abc.345/01de-35')).toBe(true);
+    });
+
+    test('should reject wrong check digits', () => {
+      expect(isValid('12ABC34501DE99')).toBe(false);
+    });
+
+    test('should reject alphanumeric CNPJ with wrong length', () => {
+      expect(isValid('12ABC3450')).toBe(false);
+    });
+  });
 });
