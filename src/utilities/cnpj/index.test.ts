@@ -152,24 +152,88 @@ describe('isValid', () => {
   });
 
   describe('alphanumeric CNPJ', () => {
-    test('should validate official example unmasked', () => {
-      expect(isValid('12ABC34501DE35')).toBe(true);
+    describe('should return true', () => {
+      test('when is the official alphanumeric example with mask', () => {
+        expect(isValid('12.ABC.345/01DE-35')).toBe(true);
+      });
+
+      test('when is the official alphanumeric example without mask', () => {
+        expect(isValid('12ABC34501DE35')).toBe(true);
+      });
+
+      test('when is alphanumeric lowercase with mask', () => {
+        expect(isValid('12.abc.345/01de-35')).toBe(true);
+      });
+
+      test('when is alphanumeric lowercase without mask', () => {
+        expect(isValid('12abc34501de35')).toBe(true);
+      });
+
+      test('when is alphanumeric mixed case without mask', () => {
+        expect(isValid('12AbC34501dE35')).toBe(true);
+      });
     });
 
-    test('should validate official example masked', () => {
-      expect(isValid('12.ABC.345/01DE-35')).toBe(true);
+    describe('should return false', () => {
+      test('when alphanumeric CNPJ has wrong check digits', () => {
+        expect(isValid('12ABC34501DE99')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ has wrong first check digit', () => {
+        expect(isValid('12ABC34501DE45')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ has wrong second check digit', () => {
+        expect(isValid('12ABC34501DE37')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ is too short', () => {
+        expect(isValid('12ABC3450')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ is too long', () => {
+        expect(isValid('12ABC34501DE350')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ has letters in check digit positions', () => {
+        expect(isValid('12ABC34501DEAB')).toBe(false);
+      });
+
+      test('when alphanumeric CNPJ has letters in check digit positions with mask', () => {
+        expect(isValid('12.ABC.345/01DE-AB')).toBe(false);
+      });
+    });
+  });
+
+  describe('numeric CNPJ backward compatibility', () => {
+    test('should reject all reserved/blacklisted numbers', () => {
+      RESERVED_NUMBERS.forEach((cnpj) => {
+        expect(isValid(cnpj)).toBe(false);
+      });
     });
 
-    test('should validate lowercase input', () => {
-      expect(isValid('12.abc.345/01de-35')).toBe(true);
+    test('should reject reserved number with mask', () => {
+      expect(isValid('00.000.000/0000-00')).toBe(false);
+      expect(isValid('11.111.111/1111-11')).toBe(false);
     });
 
-    test('should reject wrong check digits', () => {
-      expect(isValid('12ABC34501DE99')).toBe(false);
+    test('should accept valid numeric CNPJ without mask', () => {
+      expect(isValid('13723705000189')).toBe(true);
+      expect(isValid('46843485000186')).toBe(true);
     });
 
-    test('should reject alphanumeric CNPJ with wrong length', () => {
-      expect(isValid('12ABC3450')).toBe(false);
+    test('should accept valid numeric CNPJ with mask', () => {
+      expect(isValid('60.391.947/0001-00')).toBe(true);
+      expect(isValid('46.843.485/0001-86')).toBe(true);
+    });
+
+    test('should reject numeric CNPJ with wrong length', () => {
+      expect(isValid('1372370500018')).toBe(false);
+      expect(isValid('137237050001899')).toBe(false);
+    });
+
+    test('should reject numeric CNPJ with wrong check digits', () => {
+      expect(isValid('11257245286531')).toBe(false);
     });
   });
 });
