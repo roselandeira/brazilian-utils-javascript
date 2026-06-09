@@ -168,8 +168,56 @@ describe('isValid', () => {
       expect(isValid('12.ABC.345/01DE-99')).toBe(false);
     });
 
+    test('when check digits are swapped', () => {
+      expect(isValid('12.ABC.345/01DE-53')).toBe(false);
+    });
+
     test('when letters appear in check-digit positions', () => {
       expect(isValid('12.ABC.345/01DE-AB')).toBe(false);
+    });
+
+    test('when input is too short (missing characters)', () => {
+      expect(isValid('12.ABC.345/01D-35')).toBe(false);
+      expect(isValid('12ABC3450135')).toBe(false);
+    });
+
+    test('when input is too long (extra characters)', () => {
+      expect(isValid('12.ABC.345/01DEF-35')).toBe(false);
+      expect(isValid('12ABC34501DE3599')).toBe(false);
+    });
+
+    test('when input contains special characters in the body', () => {
+      expect(isValid('12.@BC.345/01DE-35')).toBe(false);
+      expect(isValid('12.AB!.345/01DE-35')).toBe(false);
+    });
+  });
+
+  describe('should handle lowercase alphanumeric input', () => {
+    test('when lowercase with mask', () => {
+      expect(isValid('12.abc.345/01de-35')).toBe(true);
+    });
+
+    test('when lowercase without mask', () => {
+      expect(isValid('12abc34501de35')).toBe(true);
+    });
+
+    test('when mixed case with mask', () => {
+      expect(isValid('12.AbC.345/01dE-35')).toBe(true);
+    });
+
+    test('when mixed case without mask', () => {
+      expect(isValid('12aBc34501De35')).toBe(true);
+    });
+  });
+
+  describe('should reject reserved/blacklisted numbers', () => {
+    test('when all-same-digit numeric with mask', () => {
+      expect(isValid('00.000.000/0000-00')).toBe(false);
+      expect(isValid('11.111.111/1111-11')).toBe(false);
+    });
+
+    test('when all-same-digit numeric without mask', () => {
+      RESERVED_NUMBERS.forEach((cnpj) => expect(isValid(cnpj)).toBe(false));
     });
   });
 });
